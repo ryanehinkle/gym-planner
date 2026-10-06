@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d12" />
+  <meta name="description" content="Personal strength, running, and fitness planner." />
+  <title>Form — Gym Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand" data-tab-target="dashboard">
+        <div class="brand-mark">F</div>
+        <div>
+          <div class="brand-name">FORM</div>
+          <div class="brand-sub">Gym Planner</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">⌂</span><span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="workouts">
+          <span class="nav-icon">↗</span><span>Plan</span>
+        </button>
+        <button class="nav-item" data-tab="goals">
+          <span class="nav-icon">◎</span><span>Goals</span>
+        </button>
+        <button class="nav-item" data-tab="history">
+          <span class="nav-icon">◷</span><span>History</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙</span><span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-card">
+        <div class="sidebar-card-kicker">Weekly target</div>
+        <div class="sidebar-card-row">
+          <strong id="sidebarProgressText">0 / 4</strong>
+          <span id="sidebarProgressPct">0%</span>
+        </div>
+        <div class="mini-progress"><span id="sidebarProgressBar"></span></div>
+        <p>Two lifts. Two runs. Keep stacking weeks.</p>
+      </div>
+
+      <div class="profile-mini">
+        <div class="profile-avatar">RH</div>
+        <div>
+          <strong>Ryan</strong>
+          <span>Strength + fitness</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="pageEyebrow">YOUR TRAINING</div>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="streak-pill"><span>⚡</span><strong id="streakCount">0</strong> week streak</div>
+          <button class="primary-btn" id="quickLogBtn">+ Log workout</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="tab-page active">
+        <div class="hero-grid">
+          <article class="card hero-card">
+            <div class="hero-copy">
+              <div class="eyebrow accent">NEXT UP</div>
+              <h2 id="nextWorkoutTitle">Loading plan…</h2>
+              <p id="nextWorkoutSubtitle">Your next session will appear here.</p>
+              <div class="hero-meta" id="nextWorkoutMeta"></div>
+              <button class="primary-btn hero-button" id="startNextBtn">View session →</button>
+            </div>
+            <div class="hero-ring-wrap">
+              <div class="hero-ring" id="weekRing">
+                <div>
+                  <strong id="weekRingValue">0%</strong>
+                  <span>this week</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card readiness-card">
+            <div class="card-header">
+              <div>
+                <div class="eyebrow">CONSISTENCY</div>
+                <h3>Current streak</h3>
+              </div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="big-number"><span id="streakBig">0</span><small>weeks</small></div>
+            <p>Complete at least 3 planned sessions to keep the streak alive.</p>
+          </article>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card">
+            <div class="stat-icon">✓</div>
+            <div class="stat-label">Sessions completed</div>
+            <div class="stat-value" id="totalSessions">0</div>
+            <div class="stat-foot" id="sessionsThisMonth">0 this month</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon">↟</div>
+            <div class="stat-label">Strength progress</div>
+            <div class="stat-value"><span id="strengthProgress">0</span><small>%</small></div>
+            <div class="stat-foot">toward current goals</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon">⌁</div>
+            <div class="stat-label">Run distance</div>
+            <div class="stat-value"><span id="runMiles">0.0</span><small>mi</small></div>
+            <div class="stat-foot">all-time logged</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon">◒</div>
+            <div class="stat-label">Training volume</div>
+            <div class="stat-value"><span id="volumeValue">0</span><small>lb</small></div>
+            <div class="stat-foot">last 30 days</div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="card chart-card">
+            <div class="card-header chart-header">
+              <div>
+                <div class="eyebrow">PROGRESSION</div>
+                <h3>Goal trajectory</h3>
+                <p>Your actual strength score vs. the pace to your targets.</p>
+              </div>
+              <div class="chart-legend">
+                <span><i class="legend-dot actual"></i>Actual</span>
+                <span><i class="legend-line target"></i>Target</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="progressChart"></canvas>
+              <div class="empty-chart" id="emptyChart">
+                <strong>Your graph starts with your first lift.</strong>
+                <span>Log Monday or Friday and your actual line will appear.</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="card week-card">
+            <div class="card-header">
+              <div>
+                <div class="eyebrow">THIS WEEK</div>
+                <h3>Training plan</h3>
+              </div>
+              <button class="text-btn" data-tab-jump="workouts">Open plan</button>
+            </div>
+            <div class="week-list" id="weekList"></div>
+          </article>
+        </div>
+
+        <article class="card insight-card" id="insightCard">
+          <div class="insight-icon">✦</div>
+          <div>
+            <div class="eyebrow">COACH NOTE</div>
+            <h3 id="coachTitle">Build the habit first.</h3>
+            <p id="coachText">Your first goal is consistency. Clean reps and repeatable sessions beat maxing out early.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="workouts" class="tab-page">
+        <div class="section-intro">
+          <div>
+            <div class="eyebrow accent">YOUR WEEK</div>
+            <h2>Exactly what to do.</h2>
+            <p>Open a session, follow the targets, then record what you actually completed.</p>
+          </div>
+          <div class="week-switcher">
+            <button id="prevWeekBtn">←</button>
+            <span id="weekLabel">This week</span>
+            <button id="nextWeekBtn">→</button>
+          </div>
+        </div>
+        <div class="plan-grid" id="planGrid"></div>
+      </section>
+
+      <section id="goals" class="tab-page">
+        <div class="section-intro">
+          <div>
+            <div class="eyebrow accent">PROGRESSIVE OVERLOAD</div>
+            <h2>Goals that move with you.</h2>
+            <p>Hit the top of a rep range with clean form and FORM will recommend the next step.</p>
+          </div>
+          <button class="secondary-btn" id="recalcGoalsBtn">Recalculate recommendations</button>
+        </div>
+
+        <div class="goal-summary-grid">
+          <article class="card goal-summary">
+            <div class="eyebrow">CURRENT PHASE</div>
+            <h3>Foundation</h3>
+            <p>Build consistency, technique and repeatable strength across the first 8 weeks.</p>
+            <div class="phase-track"><span id="phaseProgress"></span></div>
+          </article>
+          <article class="card goal-summary">
+            <div class="eyebrow">RULE</div>
+            <h3>Own the reps → add weight</h3>
+            <p>When every working set reaches the top of the target range at RIR 2+, increase one machine increment next time.</p>
+          </article>
+          <article class="card goal-summary">
+            <div class="eyebrow">12-WEEK TARGET</div>
+            <h3 id="goalTargetSummary">Stronger everywhere</h3>
+            <p>Targets are editable. The dashboard goal line recalculates from these numbers.</p>
+          </article>
+        </div>
+
+        <div class="goals-toolbar">
+          <div class="segmented">
+            <button class="active" data-goal-filter="strength">Strength</button>
+            <button data-goal-filter="running">Running</button>
+          </div>
+        </div>
+        <div id="goalsList" class="goals-list"></div>
+      </section>
+
+      <section id="history" class="tab-page">
+        <div class="section-intro">
+          <div>
+            <div class="eyebrow accent">TRAINING LOG</div>
+            <h2>Your work, saved.</h2>
+            <p>Every completed session lives here and feeds your dashboard statistics.</p>
+          </div>
+          <button class="secondary-btn danger-soft" id="clearHistoryBtn">Clear history</button>
+        </div>
+        <div class="history-filters">
+          <button class="active" data-history-filter="all">All</button>
+          <button data-history-filter="gym">Gym</button>
+          <button data-history-filter="run">Runs</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section id="settings" class="tab-page">
+        <div class="section-intro">
+          <div>
+            <div class="eyebrow accent">SETTINGS</div>
+            <h2>Make the plan yours.</h2>
+            <p>Adjust your baseline details and how progression recommendations behave.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <article class="card settings-card">
+            <h3>Profile</h3>
+            <div class="form-grid">
+              <label>Name<input id="profileName" type="text" /></label>
+              <label>Body weight (lb)<input id="profileWeight" type="number" step="0.1" /></label>
+              <label>Height<input id="profileHeight" type="text" /></label>
+              <label>Primary goal<select id="profileGoal"><option value="fit">Strong + athletic</option><option value="strength">Strength</option><option value="endurance">Endurance</option></select></label>
+            </div>
+          </article>
+          <article class="card settings-card">
+            <h3>Progression</h3>
+            <div class="form-grid">
+              <label>Upper-body increase<select id="upperIncrement"><option value="5">5 lb</option><option value="10">10 lb</option></select></label>
+              <label>Lower-body increase<select id="lowerIncrement"><option value="5">5 lb</option><option value="10">10 lb</option><option value="15">15 lb</option></select></label>
+              <label>Run increase / week<select id="runIncrement"><option value="5">5 min</option><option value="10">10 min</option></select></label>
+              <label>Training week starts<select id="weekStart"><option value="1">Monday</option><option value="0">Sunday</option></select></label>
+            </div>
+          </article>
+        </div>
+        <div class="settings-actions">
+          <button class="primary-btn" id="saveSettingsBtn">Save settings</button>
+          <button class="secondary-btn" id="exportDataBtn">Export data</button>
+          <label class="secondary-btn file-btn">Import data<input id="importDataInput" type="file" accept=".json" hidden /></label>
+          <button class="secondary-btn danger-soft" id="resetAppBtn">Reset app</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="sessionModal">
+    <div class="modal">
+      <button class="modal-close" id="closeSessionModal">×</button>
+      <div id="sessionModalContent"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

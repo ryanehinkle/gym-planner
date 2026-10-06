@@ -1,7 +1,7 @@
-const STORAGE_KEY="formGymPlannerV1";
+const STORAGE_KEY="formGymPlannerV2";
 
-const defaultPlan = {
-  tuesday:{day:"Tuesday",type:"gym",title:"Full Body A",subtitle:"Strength + muscle • machine focused",duration:"~60 min",exercises:[
+const defaultPlan={
+  tuesday:{day:"Tuesday",type:"gym",title:"Full Body A",duration:"~60 min",exercises:[
     {name:"Chest Press Machine",sets:3,min:8,max:10,weight:50,rest:120,group:"upper"},
     {name:"Leg Press",sets:3,min:10,max:10,weight:120,rest:120,group:"lower"},
     {name:"Lat Pulldown",sets:3,min:8,max:10,weight:70,rest:90,group:"upper"},
@@ -11,8 +11,8 @@ const defaultPlan = {
     {name:"Ab Crunch Machine",sets:3,min:12,max:15,weight:40,rest:60,group:"core"},
     {name:"Plank",sets:2,min:30,max:60,weight:0,rest:60,group:"core",unit:"sec"}
   ]},
-  wednesday:{day:"Wednesday",type:"run",title:"Easy Run",subtitle:"Conversational aerobic work",duration:"20–25 min",run:{minutes:22,distance:2.0,effort:5,note:"Easy conversational pace"}},
-  friday:{day:"Friday",type:"gym",title:"Full Body B",subtitle:"Strength + muscle • machine focused",duration:"~60 min",exercises:[
+  wednesday:{day:"Wednesday",type:"run",title:"Easy Run",duration:"20–25 min",run:{minutes:22,distance:2,effort:5,note:"Easy conversational pace"}},
+  friday:{day:"Friday",type:"gym",title:"Full Body B",duration:"~60 min",exercises:[
     {name:"Incline Chest Press Machine",sets:3,min:8,max:10,weight:45,rest:120,group:"upper"},
     {name:"Leg Press",sets:3,min:8,max:10,weight:130,rest:120,group:"lower"},
     {name:"Assisted Pull-Up Machine",sets:3,min:6,max:10,weight:70,rest:120,group:"upper",assistance:true},
@@ -23,315 +23,351 @@ const defaultPlan = {
     {name:"Rope Triceps Pushdown",sets:2,min:10,max:12,weight:25,rest:60,group:"upper"},
     {name:"Ab Crunch Machine",sets:3,min:12,max:15,weight:40,rest:60,group:"core"}
   ]},
-  sunday:{day:"Sunday",type:"run",title:"Quality Run",subtitle:"Controlled intensity • tempo / progression",duration:"30–35 min",run:{minutes:32,distance:2.8,effort:7,note:"10 min easy • 10–15 min comfortably hard • easy cooldown"}}
+  sunday:{day:"Sunday",type:"run",title:"Quality Run",duration:"30–35 min",run:{minutes:32,distance:2.8,effort:7,note:"10 min easy • 10–15 min comfortably hard • easy cooldown"}}
 };
 
-const goalDefaults = {
-  "Chest Press Machine":90,"Leg Press":220,"Lat Pulldown":110,"Seated Leg Curl":90,"Seated Row Machine":100,
-  "Shoulder Press Machine":60,"Ab Crunch Machine":80,"Incline Chest Press Machine":80,"Assisted Pull-Up Machine":30,
-  "Leg Extension":100,"Reverse Pec Deck":60,"Biceps Curl Machine":45,"Single-Arm Cable Triceps Extension":25,"Rope Triceps Pushdown":50
+const goals={
+  "Chest Press Machine":75,
+  "Leg Press":180,
+  "Lat Pulldown":100,
+  "Seated Leg Curl":75,
+  "Seated Row Machine":90,
+  "Shoulder Press Machine":50,
+  "Ab Crunch Machine":65,
+  "Incline Chest Press Machine":70,
+  "Assisted Pull-Up Machine":40,
+  "Leg Extension":80,
+  "Reverse Pec Deck":50,
+  "Biceps Curl Machine":40,
+  "Single-Arm Cable Triceps Extension":20,
+  "Rope Triceps Pushdown":45,
+  "Easy Run":35,
+  "Quality Run":45
 };
+
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const clone=x=>JSON.parse(JSON.stringify(x));
 
 function initialState(){
-  return {
-    profile:{name:"Ryan",weight:155,height:"5'11\"",goal:"fit"},
-    settings:{upperIncrement:5,lowerIncrement:10,runIncrement:5,weekStart:1},
-    plan:JSON.parse(JSON.stringify(defaultPlan)),
-    goals:{...goalDefaults,runEasyMinutes:40,runLongMinutes:60},
-    logs:[],
-    createdAt:new Date().toISOString()
-  };
+  return {plan:clone(defaultPlan),logs:[],createdAt:new Date().toISOString()};
 }
-let state=loadState();
-let weekOffset=0, goalFilter="strength", historyFilter="all";
 
-function loadState(){
-  try{const x=JSON.parse(localStorage.getItem(STORAGE_KEY));return x?mergeState(x):initialState()}catch{return initialState()}
-}
-function mergeState(x){
+function normalizeState(raw){
   const d=initialState();
-  const raw=x?.plan&&typeof x.plan==="object"?JSON.parse(JSON.stringify(x.plan)):{};
-
-  // Always rebuild the plan into the current Tue/Wed/Fri/Sun schema.
-  const tueSource=raw.tuesday||raw.monday||{};
-  const normalizedPlan={
-    tuesday:{...d.plan.tuesday,...tueSource,day:"Tuesday",type:"gym"},
-    wednesday:{...d.plan.wednesday,...(raw.wednesday||{}),day:"Wednesday",type:"run"},
-    friday:{...d.plan.friday,...(raw.friday||{}),day:"Friday",type:"gym"},
-    sunday:{...d.plan.sunday,...(raw.sunday||{}),day:"Sunday",type:"run"}
+  if(!raw||typeof raw!=="object")return d;
+  const oldPlan=raw.plan||{};
+  const tue=oldPlan.tuesday||oldPlan.monday||{};
+  const plan={
+    tuesday:{...d.plan.tuesday,...tue,day:"Tuesday",type:"gym"},
+    wednesday:{...d.plan.wednesday,...(oldPlan.wednesday||{}),day:"Wednesday",type:"run"},
+    friday:{...d.plan.friday,...(oldPlan.friday||{}),day:"Friday",type:"gym"},
+    sunday:{...d.plan.sunday,...(oldPlan.sunday||{}),day:"Sunday",type:"run",title:"Quality Run",duration:"30–35 min"}
   };
-
-  ["tuesday","friday"].forEach(key=>{
-    const defaults=d.plan[key].exercises;
-    const saved=Array.isArray(normalizedPlan[key].exercises)?normalizedPlan[key].exercises:[];
-    normalizedPlan[key].exercises=defaults.map(def=>{
-      const prior=saved.find(e=>e?.name===def.name);
-      return prior?{...def,...prior}:{...def};
+  ["tuesday","friday"].forEach(k=>{
+    const saved=Array.isArray(plan[k].exercises)?plan[k].exercises:[];
+    plan[k].exercises=d.plan[k].exercises.map(def=>{
+      const p=saved.find(e=>e&&e.name===def.name);
+      return p?{...def,...p}:{...def};
     });
   });
+  plan.wednesday.run={...d.plan.wednesday.run,...(oldPlan.wednesday?.run||{}),note:"Easy conversational pace"};
+  plan.sunday.run={...d.plan.sunday.run,...(oldPlan.sunday?.run||{}),effort:7,note:"10 min easy • 10–15 min comfortably hard • easy cooldown"};
+  const logs=Array.isArray(raw.logs)?raw.logs.map(l=>l?.dayKey==="monday"?{...l,dayKey:"tuesday"}:l):[];
+  return {...d,...raw,plan,logs};
+}
 
-  normalizedPlan.wednesday.run={
-    ...d.plan.wednesday.run,
-    ...(raw.wednesday?.run||{}),
-    note:"Easy conversational pace"
-  };
-
-  normalizedPlan.sunday={
-    ...normalizedPlan.sunday,
-    title:"Quality Run",
-    subtitle:"Controlled intensity • tempo / progression",
-    duration:"30–35 min",
-    run:{
-      ...d.plan.sunday.run,
-      ...(raw.sunday?.run||{}),
-      effort:7,
-      note:"10 min easy • 10–15 min comfortably hard • easy cooldown"
+function loadState(){
+  try{
+    const current=localStorage.getItem(STORAGE_KEY);
+    if(current)return normalizeState(JSON.parse(current));
+    const legacy=localStorage.getItem("formGymPlannerV1");
+    if(legacy){
+      const migrated=normalizeState(JSON.parse(legacy));
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(migrated));
+      return migrated;
     }
-  };
-
-  const logs=Array.isArray(x?.logs)?x.logs.map(log=>
-    log?.dayKey==="monday"?{...log,dayKey:"tuesday"}:log
-  ):[];
-
-  return {
-    ...d,
-    ...x,
-    profile:{...d.profile,...(x?.profile||{})},
-    settings:{...d.settings,...(x?.settings||{})},
-    plan:normalizedPlan,
-    goals:{...d.goals,...(x?.goals||{})},
-    logs
-  };
+  }catch{}
+  return initialState();
 }
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
-function fmtDate(d){return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
-function isoDate(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).toISOString().slice(0,10)}
+let state=loadState();
+let weekOffset=0;
+let goalTab="strength";
+let activeSession=null;
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800)}
+
 function mondayOf(date=new Date()){
-  const d=new Date(date);d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d;
+  const d=new Date(date);d.setHours(0,0,0,0);
+  const day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d;
 }
-function weekRange(offset=0){const start=mondayOf();start.setDate(start.getDate()+offset*7);const end=new Date(start);end.setDate(start.getDate()+6);return {start,end}}
-function dayDate(dayKey,offset=0){const map={tuesday:1,wednesday:2,friday:4,sunday:6};const d=weekRange(offset).start;const x=new Date(d);x.setDate(d.getDate()+map[dayKey]);return x}
-function logFor(dayKey,offset=0){const date=isoDate(dayDate(dayKey,offset));return state.logs.find(l=>l.date===date&&l.dayKey===dayKey)}
-function completedThisWeek(){return Object.keys(defaultPlan).filter(k=>!!logFor(k,0)).length}
-function sessionCountThisMonth(){const now=new Date();return state.logs.filter(l=>{const d=new Date(l.date+"T12:00:00");return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()}).length}
-function totalRunMiles(){return state.logs.filter(l=>l.type==="run").reduce((a,l)=>a+(+l.distance||0),0)}
-function volume30(){
-  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
-  return state.logs.filter(l=>l.type==="gym"&&new Date(l.date)>=cutoff).reduce((sum,l)=>sum+(l.exercises||[]).reduce((s,e)=>s+(+e.weight||0)*(+e.reps||0)*(+e.sets||0),0),0);
-}
-function latestWeight(name){
-  const logs=[...state.logs].filter(l=>l.type==="gym").sort((a,b)=>b.date.localeCompare(a.date));
-  for(const l of logs){const e=(l.exercises||[]).find(x=>x.name===name);if(e&&+e.weight>=0)return +e.weight}
-  for(const d of Object.values(state.plan)){if(d.exercises){const e=d.exercises.find(x=>x.name===name);if(e)return e.weight}}
-  return 0;
-}
-function strengthProgress(){
-  const names=Object.keys(goalDefaults);let total=0,count=0;
-  names.forEach(n=>{const goal=+state.goals[n]||0;if(goal>0){total+=Math.min(1,latestWeight(n)/goal);count++}});
-  return count?Math.round(total/count*100):0;
-}
-function streakWeeks(){
-  let streak=0;
-  for(let i=0;i<52;i++){
-    const {start,end}=weekRange(-i);
-    const c=state.logs.filter(l=>{const d=new Date(l.date+"T12:00:00");return d>=start&&d<=new Date(end.getFullYear(),end.getMonth(),end.getDate(),23,59,59)}).length;
-    if(c>=3)streak++; else if(i===0&&c<3)continue; else break;
-  }
-  return streak;
-}
+function weekRange(offset=0){const start=mondayOf();start.setDate(start.getDate()+offset*7);const end=new Date(start);end.setDate(start.getDate()+6);return{start,end}}
+function dayDate(key,offset=0){const map={tuesday:1,wednesday:2,friday:4,sunday:6};const d=weekRange(offset).start;const x=new Date(d);x.setDate(d.getDate()+map[key]);return x}
+function iso(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).toISOString().slice(0,10)}
+function fmt(d){return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+function logFor(key,offset=0){const date=iso(dayDate(key,offset));return state.logs.find(l=>l.dayKey===key&&l.date===date)}
+function thisWeekCount(){return Object.keys(defaultPlan).filter(k=>logFor(k,0)).length}
+function totalMiles(){return state.logs.filter(l=>l.type==="run").reduce((a,l)=>a+(+l.distance||0),0)}
 function nextSession(){
-  const now=new Date(), order=["tuesday","wednesday","friday","sunday"];
-  for(const k of order){const d=dayDate(k,0);d.setHours(23,59,59);if(now<=d&&!logFor(k,0))return {key:k,date:dayDate(k,0),...state.plan[k]}}
-  return {key:"tuesday",date:dayDate("tuesday",1),...state.plan.tuesday,nextWeek:true};
+  const order=["tuesday","wednesday","friday","sunday"],now=new Date();
+  for(const key of order){const d=dayDate(key);d.setHours(23,59,59);if(now<=d&&!logFor(key))return{key,date:dayDate(key),...state.plan[key]}}
+  return{key:"tuesday",date:dayDate("tuesday",1),...state.plan.tuesday,nextWeek:true};
+}
+function latestExercise(name){
+  const logs=[...state.logs].filter(l=>l.type==="gym").sort((a,b)=>b.date.localeCompare(a.date));
+  for(const log of logs){
+    const ex=(log.exercises||[]).find(e=>e.name===name);
+    if(ex){
+      if(Array.isArray(ex.setsDone)){
+        const done=ex.setsDone.filter(s=>s.done);
+        if(done.length)return{name,weight:done.reduce((a,s)=>a+(+s.weight||0),0)/done.length,reps:done.reduce((a,s)=>a+(+s.reps||0),0)/done.length};
+      }
+      if(ex.weight!=null)return{name,weight:+ex.weight||0,reps:+ex.reps||0};
+    }
+  }
+  for(const p of Object.values(state.plan)){const e=(p.exercises||[]).find(e=>e.name===name);if(e)return{name,weight:e.weight,reps:e.min}}
+  return{name,weight:0,reps:0};
+}
+function exerciseDefault(name){
+  for(const p of Object.values(defaultPlan)){const e=(p.exercises||[]).find(x=>x.name===name);if(e)return e}
+  return null;
+}
+function exerciseProgress(name){
+  const goal=goals[name],cur=latestExercise(name).weight,base=exerciseDefault(name)?.weight||0;
+  if(goal==null)return 0;
+  if(name==="Assisted Pull-Up Machine"){
+    if(base===goal)return 100;
+    return Math.max(0,Math.min(100,Math.round((base-cur)/(base-goal)*100)));
+  }
+  if(goal===base)return 100;
+  return Math.max(0,Math.min(100,Math.round((cur-base)/(goal-base)*100)));
+}
+function overallGoalProgress(){
+  const names=Object.keys(goals).filter(k=>!["Easy Run","Quality Run"].includes(k));
+  return Math.round(names.reduce((a,n)=>a+exerciseProgress(n),0)/names.length);
 }
 
-function switchTab(id){
-  $$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.tab===id));
-  $$(".tab-page").forEach(p=>p.classList.toggle("active",p.id===id));
-  const names={dashboard:["YOUR TRAINING","Dashboard"],workouts:["WEEKLY PLAN","Plan"],goals:["PROGRESSION","Goals"],history:["TRAINING LOG","History"],settings:["PREFERENCES","Settings"]};
-  $("#pageEyebrow").textContent=names[id][0];$("#pageTitle").textContent=names[id][1];
-  if(id==="dashboard")setTimeout(drawChart,80);
+function go(page){
+  $$(".page").forEach(p=>p.classList.toggle("active",p.id===page));
+  $$(".bottom-nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
+  if(page==="home")setTimeout(drawChart,50);
   window.scrollTo({top:0,behavior:"smooth"});
 }
-$$(".nav-item").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-$$("[data-tab-jump]").forEach(b=>b.onclick=()=>switchTab(b.dataset.tabJump));
-$("[data-tab-target]").onclick=()=>switchTab("dashboard");
+$$(".bottom-nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
+$$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 
-function renderDashboard(){
-  const done=completedThisWeek(),pct=Math.round(done/4*100),streak=streakWeeks(),next=nextSession();
-  $("#sidebarProgressText").textContent=done+" / 4";$("#sidebarProgressPct").textContent=pct+"%";$("#sidebarProgressBar").style.width=pct+"%";
-  $("#weekRing").style.setProperty("--p",pct);$("#weekRingValue").textContent=pct+"%";
-  $("#streakCount").textContent=streak;$("#streakBig").textContent=streak;
-  $("#totalSessions").textContent=state.logs.length;$("#sessionsThisMonth").textContent=sessionCountThisMonth()+" this month";
-  $("#strengthProgress").textContent=strengthProgress();$("#runMiles").textContent=totalRunMiles().toFixed(1);
-  $("#volumeValue").textContent=Math.round(volume30()).toLocaleString();
-  $("#nextWorkoutTitle").textContent=next.title;
-  $("#nextWorkoutSubtitle").textContent=(next.nextWeek?"Next week • ":"")+next.day+" • "+fmtDate(next.date)+" • "+next.subtitle;
-  const meta=next.type==="gym"?[next.duration,(next.exercises||[]).length+" exercises","RIR 2–3"]: [next.duration,"Easy pace","Conversational"];
-  $("#nextWorkoutMeta").innerHTML=meta.map(x=>'<span class="meta-pill">'+x+'</span>').join("");
-  $("#startNextBtn").onclick=()=>openSession(next.key,next.nextWeek?1:0);
-
+function renderHome(){
+  const n=nextSession(),count=thisWeekCount();
+  $("#todayLabel").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+  $("#weekCount").textContent=count+"/4 complete";
+  $("#nextDay").textContent=(n.nextWeek?"Next week • ":"")+n.day+" • "+fmt(n.date);
+  $("#nextTitle").textContent=n.title;
+  $("#nextDetail").textContent=n.type==="gym" ? n.exercises.length+" exercises • "+n.duration : n.run.note+" • "+n.duration;
+  $("#startNext").onclick=()=>openSession(n.key,n.nextWeek?1:0);
+  $("#statWeek").textContent=count+"/4";
+  $("#statSessions").textContent=state.logs.length;
+  $("#statMiles").textContent=totalMiles().toFixed(1);
+  $("#statGoals").textContent=overallGoalProgress()+"%";
   $("#weekList").innerHTML=Object.keys(state.plan).map(k=>{
-    const p=state.plan[k],done=!!logFor(k,0);
-    return '<div class="week-item '+(done?"done":"")+'"><div class="week-day">'+p.day.slice(0,3).toUpperCase()+'</div><div class="week-item-main"><strong>'+p.title+'</strong><span>'+p.duration+'</span></div><div class="week-check">'+(done?"✓":"")+'</div></div>';
+    const p=state.plan[k],done=!!logFor(k);
+    return '<div class="week-row '+(done?"done":"")+'"><div class="week-day">'+p.day.slice(0,3).toUpperCase()+'</div><div><strong>'+p.title+'</strong><span>'+p.duration+'</span></div><div class="week-status">'+(done?"✓":"")+'</div></div>';
   }).join("");
-
-  const sp=strengthProgress();
-  if(state.logs.length===0){$("#coachTitle").textContent="Build the habit first.";$("#coachText").textContent="Week one should feel controlled. Leave 2–3 good reps in reserve and establish clean baselines."}
-  else if(done>=4){$("#coachTitle").textContent="Perfect week.";$("#coachText").textContent="All four planned sessions are logged. Recover, then repeat before making big jumps."}
-  else if(sp>=75){$("#coachTitle").textContent="Targets are getting close.";$("#coachText").textContent="You're above 75% of your first strength targets. Keep earning small jumps instead of forcing them."}
-  else{$("#coachTitle").textContent="Keep stacking clean sessions.";$("#coachText").textContent="Your logged work is driving the recommendations. Hit the top of a rep range before adding weight."}
   drawChart();
 }
 
 function renderPlan(){
   const {start,end}=weekRange(weekOffset);
-  $("#weekLabel").textContent=weekOffset===0?"This week":weekOffset===1?"Next week":weekOffset===-1?"Last week":fmtDate(start)+" – "+fmtDate(end);
-  const cards=[];
-  Object.keys(state.plan).forEach(k=>{
-    const p=state.plan[k],log=logFor(k,weekOffset),d=dayDate(k,weekOffset);
-    let preview="";
-    if(p.type==="gym") preview=p.exercises.slice(0,5).map(e=>'<div class="exercise-row"><div><strong>'+e.name+'</strong><span>'+e.sets+' sets • '+Math.round(e.rest/60*10)/10+' min rest</span></div><span class="exercise-target">'+(e.weight?e.weight+" lb • ":"")+e.min+(e.max!==e.min?"–"+e.max:"")+' reps</span></div>').join("")+'<div class="exercise-row"><div><strong>+'+(p.exercises.length-5)+' more</strong><span>Open session for full plan</span></div></div>';
-    else preview='<div class="exercise-row"><div><strong>'+p.run.note+'</strong><span>Effort '+p.run.effort+'/10'+(k==="sunday"?" • controlled quality":" • no racing")+'</span></div><span class="exercise-target">'+p.run.minutes+' min target</span></div>';
-    cards.push('<article class="card plan-card"><div class="plan-card-top"><div><div class="day-badge">'+p.day.toUpperCase()+' • '+fmtDate(d)+'</div><h3>'+p.title+'</h3><p>'+p.subtitle+'</p></div><span class="type-badge">'+(p.type==="gym"?"STRENGTH":"RUN")+'</span></div><div class="exercise-preview">'+preview+'</div><div class="plan-actions"><button class="'+(log?"secondary-btn":"primary-btn")+'" onclick="openSession(\''+k+'\','+weekOffset+')">'+(log?"View / edit log":"Start & log session")+'</button>'+(log?'<span class="completed-badge">✓ COMPLETE</span>':'')+'</div></article>');
-  });
-  $("#planGrid").innerHTML=cards.join("");
-}
-
-function recommendationFor(e){
-  const logs=[...state.logs].filter(l=>l.type==="gym").sort((a,b)=>b.date.localeCompare(a.date));
-  const found=logs.map(l=>(l.exercises||[]).find(x=>x.name===e.name)).find(Boolean);
-  if(!found)return {text:"Establish baseline",next:e.weight};
-  const hit=(+found.reps||0)>=e.max && (+found.rir||0)>=2;
-  const inc=e.group==="lower"?+state.settings.lowerIncrement:+state.settings.upperIncrement;
-  if(e.assistance) return hit?{text:"Reduce assistance",next:Math.max(0,(+found.weight||e.weight)-inc)}:{text:"Repeat current",next:+found.weight};
-  return hit?{text:"Increase next time",next:(+found.weight||e.weight)+inc}:{text:"Repeat & own reps",next:+found.weight};
-}
-
-function renderGoals(){
-  $("#phaseProgress").style.width=Math.min(100,state.logs.length/32*100)+"%";
-  const entries=[];
-  if(goalFilter==="strength"){
-    const seen=new Set();
-    Object.values(state.plan).forEach(p=>(p.exercises||[]).forEach(e=>{
-      if(seen.has(e.name)||e.unit==="sec")return;seen.add(e.name);
-      const current=latestWeight(e.name),goal=+state.goals[e.name]||0,pc=goal?Math.min(100,Math.round(current/goal*100)):0,rec=recommendationFor(e);
-      entries.push('<div class="goal-row"><div class="goal-name"><strong>'+e.name+'</strong><span>'+rec.text+' • next '+rec.next+' lb</span></div><div class="goal-metric"><label>Current</label><strong>'+current+' lb</strong></div><div class="goal-metric"><label>12-week goal</label><strong>'+goal+' lb</strong></div><div><div class="goal-progress"><span style="width:'+pc+'%"></span></div></div><button class="goal-edit" onclick="editGoal(\''+e.name.replace(/'/g,"\\'")+'\')">✎</button></div>');
-    }));
-  }else{
-    const easy=state.plan.wednesday.run.minutes,long=state.plan.sunday.run.minutes;
-    [["Easy Run",easy,"runEasyMinutes"],["Long Easy Run",long,"runLongMinutes"]].forEach(([name,current,key])=>{
-      const goal=+state.goals[key],pc=Math.min(100,Math.round(current/goal*100));
-      entries.push('<div class="goal-row"><div class="goal-name"><strong>'+name+'</strong><span>Build duration gradually while keeping effort easy</span></div><div class="goal-metric"><label>Current plan</label><strong>'+current+' min</strong></div><div class="goal-metric"><label>Goal</label><strong>'+goal+' min</strong></div><div><div class="goal-progress"><span style="width:'+pc+'%"></span></div></div><button class="goal-edit" onclick="editGoal(\''+key+'\')">✎</button></div>');
-    });
-  }
-  $("#goalsList").innerHTML=entries.join("");
-  $("#goalTargetSummary").textContent=strengthProgress()+"% to first strength targets";
-}
-function editGoal(key){
-  const current=state.goals[key],unit=key.startsWith("run")?"minutes":"lb";
-  const v=prompt("Set goal ("+unit+"):",current);
-  if(v!==null&&v!==""&&!isNaN(v)){state.goals[key]=+v;saveState();renderAll();toast("Goal updated")}
-}
-$$("[data-goal-filter]").forEach(b=>b.onclick=()=>{$$("[data-goal-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");goalFilter=b.dataset.goalFilter;renderGoals()});
-$("#recalcGoalsBtn").onclick=()=>{
-  Object.values(state.plan).forEach(p=>(p.exercises||[]).forEach(e=>{const r=recommendationFor(e);if(r.text.includes("Increase")||r.text.includes("Reduce"))e.weight=r.next}));
-  const recentRuns=state.logs.filter(l=>l.type==="run").slice(-2);
-  if(recentRuns.length===2&&recentRuns.every(r=>(+r.effort||10)<=6)){state.plan.wednesday.run.minutes+=+state.settings.runIncrement;state.plan.sunday.run.minutes+=+state.settings.runIncrement}
-  saveState();renderAll();toast("Recommendations applied to your plan");
-};
-
-function openSession(dayKey,offset=0){
-  const p=state.plan[dayKey],date=dayDate(dayKey,offset),existing=logFor(dayKey,offset);
-  let rows="";
-  if(p.type==="gym"){
-    rows=p.exercises.map((e,i)=>{
-      const x=existing?.exercises?.find(z=>z.name===e.name)||{};
-      return '<div class="log-row"><div class="log-exercise"><strong>'+e.name+'</strong><span>Plan: '+e.sets+' × '+e.min+(e.max!==e.min?"–"+e.max:"")+(e.unit==="sec"?" sec":' • '+(e.weight||"bodyweight")+(e.weight?" lb":""))+' • rest '+e.rest+' sec</span></div><div class="log-field"><label>Weight '+(e.unit==="sec"?"(optional)":"lb")+'</label><input data-field="weight" data-i="'+i+'" type="number" step="1" value="'+(x.weight??e.weight)+'"></div><div class="log-field"><label>Avg reps</label><input data-field="reps" data-i="'+i+'" type="number" step="1" value="'+(x.reps??e.min)+'"></div><div class="log-field"><label>RIR</label><input data-field="rir" data-i="'+i+'" type="number" min="0" max="5" step="1" value="'+(x.rir??2)+'"></div></div>';
-    }).join("");
-  }else{
-    rows='<div class="log-row run"><div class="log-exercise"><strong>'+p.title+'</strong><span>Plan: '+p.run.minutes+' minutes • '+p.run.note+' • effort '+p.run.effort+'/10</span></div><div class="log-field"><label>Minutes</label><input id="runMinutes" type="number" value="'+(existing?.minutes??p.run.minutes)+'"></div><div class="log-field"><label>Miles</label><input id="runDistance" type="number" step=".01" value="'+(existing?.distance??p.run.distance)+'"></div><div class="log-field"><label>Effort 1–10</label><input id="runEffort" type="number" min="1" max="10" value="'+(existing?.effort??p.run.effort)+'"></div></div>';
-  }
-  $("#sessionModalContent").innerHTML='<div class="session-head"><div class="eyebrow accent">'+p.day.toUpperCase()+' • '+fmtDate(date)+'</div><h2>'+p.title+'</h2><p>'+p.subtitle+' — targets are guidance; record what you actually did.</p></div><div class="session-body"><div class="log-table">'+rows+'</div><div class="session-footer"><div class="session-note">'+(p.type==="gym"?"Aim to finish most working sets with 2–3 clean reps in reserve.":"Keep this easy enough to speak in full sentences.")+'</div><button class="primary-btn" id="saveSessionBtn">'+(existing?"Update session":"Complete session")+'</button></div></div>';
-  $("#sessionModal").classList.add("open");
-  $("#saveSessionBtn").onclick=()=>saveSession(dayKey,offset,p,date);
-}
-function saveSession(dayKey,offset,p,date){
-  const base={id:Date.now(),date:isoDate(date),dayKey,type:p.type,title:p.title,completedAt:new Date().toISOString()};
-  if(p.type==="gym"){
-    base.exercises=p.exercises.map((e,i)=>({
-      name:e.name,sets:e.sets,targetMin:e.min,targetMax:e.max,
-      weight:+document.querySelector('[data-field="weight"][data-i="'+i+'"]').value||0,
-      reps:+document.querySelector('[data-field="reps"][data-i="'+i+'"]').value||0,
-      rir:+document.querySelector('[data-field="rir"][data-i="'+i+'"]').value||0
-    }));
-  }else{
-    base.minutes=+$("#runMinutes").value||0;base.distance=+$("#runDistance").value||0;base.effort=+$("#runEffort").value||0;
-  }
-  const idx=state.logs.findIndex(l=>l.date===base.date&&l.dayKey===dayKey);
-  if(idx>=0){base.id=state.logs[idx].id;state.logs[idx]=base}else state.logs.push(base);
-  state.logs.sort((a,b)=>a.date.localeCompare(b.date));saveState();$("#sessionModal").classList.remove("open");renderAll();toast("Session saved — nice work");
-}
-window.openSession=openSession;window.editGoal=editGoal;
-$("#closeSessionModal").onclick=()=>$("#sessionModal").classList.remove("open");
-$("#sessionModal").onclick=e=>{if(e.target===$("#sessionModal"))$("#sessionModal").classList.remove("open")};
-$("#quickLogBtn").onclick=()=>{const n=nextSession();openSession(n.key,n.nextWeek?1:0)};
-$("#prevWeekBtn").onclick=()=>{weekOffset--;renderPlan()};$("#nextWeekBtn").onclick=()=>{weekOffset++;renderPlan()};
-
-function renderHistory(){
-  let logs=[...state.logs].reverse();if(historyFilter!=="all")logs=logs.filter(l=>l.type===historyFilter);
-  if(!logs.length){$("#historyList").innerHTML='<div class="history-empty"><strong>No sessions logged yet.</strong><br><br>Your completed workouts and runs will show up here.</div>';return}
-  $("#historyList").innerHTML=logs.map(l=>{
-    const d=new Date(l.date+"T12:00:00");
-    let stats="";
-    if(l.type==="gym"){const vol=(l.exercises||[]).reduce((s,e)=>s+(+e.weight||0)*(+e.reps||0)*(+e.sets||0),0);stats=Math.round(vol).toLocaleString()+" lb volume • "+(l.exercises||[]).length+" exercises"}
-    else stats=(+l.distance||0).toFixed(2)+" mi • "+l.minutes+" min • effort "+l.effort+"/10";
-    return '<div class="history-entry"><div class="history-date"><strong>'+d.getDate()+'</strong><span>'+d.toLocaleDateString(undefined,{month:"short"})+'</span></div><div class="history-main"><strong>'+l.title+'</strong><span>'+d.toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"})+'</span></div><div class="history-stats">'+stats+'</div></div>';
+  $("#weekLabel").textContent=weekOffset===0?"This week":weekOffset===1?"Next":weekOffset===-1?"Last":fmt(start)+"–"+fmt(end);
+  $("#planList").innerHTML=Object.keys(state.plan).map(k=>{
+    const p=state.plan[k],done=!!logFor(k,weekOffset),d=dayDate(k,weekOffset);
+    let lines="";
+    if(p.type==="gym"){
+      lines=p.exercises.map(e=>'<div class="exercise-line"><strong>'+e.name+'</strong><span>'+e.sets+' × '+e.min+(e.max!==e.min?"–"+e.max:"")+(e.unit==="sec"?" sec":' • '+(e.assistance?e.weight+" lb assist":e.weight+" lb"))+'</span></div>').join("");
+    }else{
+      lines='<div class="exercise-line"><strong>'+p.run.note+'</strong><span>'+p.run.minutes+' min • effort '+p.run.effort+'/10</span></div>';
+    }
+    return '<article class="plan-card"><div class="plan-head"><div><span class="small">'+p.day+' • '+fmt(d)+'</span><h2>'+p.title+'</h2><p>'+p.duration+'</p></div><span class="pill">'+(done?"DONE":p.type==="gym"?"LIFT":"RUN")+'</span></div><div class="exercise-lines">'+lines+'</div><button class="primary" onclick="openSession(\''+k+'\','+weekOffset+')">'+(done?"View / edit":"Start")+'</button></article>';
   }).join("");
 }
-$$("[data-history-filter]").forEach(b=>b.onclick=()=>{$$("[data-history-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");historyFilter=b.dataset.historyFilter;renderHistory()});
-$("#clearHistoryBtn").onclick=()=>{if(confirm("Clear all workout history? Your plan and goals will stay.")){state.logs=[];saveState();renderAll();toast("History cleared")}};
+$("#prevWeek").onclick=()=>{weekOffset--;renderPlan()};
+$("#nextWeek").onclick=()=>{weekOffset++;renderPlan()};
 
-function renderSettings(){
-  $("#profileName").value=state.profile.name;$("#profileWeight").value=state.profile.weight;$("#profileHeight").value=state.profile.height;$("#profileGoal").value=state.profile.goal;
-  $("#upperIncrement").value=state.settings.upperIncrement;$("#lowerIncrement").value=state.settings.lowerIncrement;$("#runIncrement").value=state.settings.runIncrement;$("#weekStart").value=state.settings.weekStart;
+function nextRecommendation(e){
+  const last=latestExercise(e.name);
+  if(!state.logs.some(l=>(l.exercises||[]).some(x=>x.name===e.name)))return "Start here and establish your baseline";
+  const inc=e.group==="lower"?10:5;
+  if(e.assistance)return "Goal: reduce assistance toward "+goals[e.name]+" lb";
+  return "Next planned load: "+e.weight+" lb";
 }
-$("#saveSettingsBtn").onclick=()=>{
-  state.profile={name:$("#profileName").value||"Ryan",weight:+$("#profileWeight").value||155,height:$("#profileHeight").value||"5'11\"",goal:$("#profileGoal").value};
-  state.settings={upperIncrement:+$("#upperIncrement").value,lowerIncrement:+$("#lowerIncrement").value,runIncrement:+$("#runIncrement").value,weekStart:+$("#weekStart").value};
-  saveState();renderAll();toast("Settings saved");
-};
-$("#exportDataBtn").onclick=()=>{
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="form-gym-data.json";a.click();URL.revokeObjectURL(a.href);
-};
-$("#importDataInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{state=mergeState(JSON.parse(r.result));saveState();renderAll();toast("Data imported")}catch{toast("That file could not be imported")}};r.readAsText(f)};
-$("#resetAppBtn").onclick=()=>{if(confirm("Reset the entire app to its original plan?")){state=initialState();saveState();renderAll();toast("App reset")}};
-
-function drawChart(){
-  const c=$("#progressChart");if(!c)return;const rect=c.getBoundingClientRect();if(rect.width<10)return;
-  const dpr=window.devicePixelRatio||1;c.width=rect.width*dpr;c.height=rect.height*dpr;const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
-  const w=rect.width,h=rect.height,pad={l:34,r:18,t:18,b:26};ctx.clearRect(0,0,w,h);
-  const gymLogs=state.logs.filter(l=>l.type==="gym").sort((a,b)=>a.date.localeCompare(b.date));
-  $("#emptyChart").style.display=gymLogs.length?"none":"flex";
-  ctx.strokeStyle="#242b36";ctx.lineWidth=1;ctx.font="9px Inter";ctx.fillStyle="#697384";
-  for(let i=0;i<=4;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText((100-i*25)+"%",4,y+3)}
-  const n=12;const pts=[];for(let i=0;i<n;i++){const x=pad.l+(w-pad.l-pad.r)*i/(n-1);const y=pad.t+(h-pad.t-pad.b)*(1-(20+(80*i/(n-1)))/100);pts.push([x,y])}
-  ctx.strokeStyle="#45d39b";ctx.globalAlpha=.65;ctx.setLineDash([5,5]);ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
-  if(gymLogs.length){
-    const grouped=gymLogs.slice(-12);const vals=grouped.map((l,idx)=>{
-      let s=0,nm=0;(l.exercises||[]).forEach(e=>{const g=+state.goals[e.name]||0;if(g){s+=Math.min(1,(+e.weight||0)/g);nm++}});return nm?s/nm*100:0;
-    });
-    const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);grad.addColorStop(0,"rgba(124,92,255,.35)");grad.addColorStop(1,"rgba(124,92,255,0)");
-    const coords=vals.map((v,i)=>[pad.l+(w-pad.l-pad.r)*(grouped.length===1?.5:i/(grouped.length-1)),pad.t+(h-pad.t-pad.b)*(1-v/100)]);
-    ctx.beginPath();coords.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));if(coords.length===1){ctx.lineTo(coords[0][0]+1,coords[0][1])}ctx.lineTo(coords.at(-1)[0],h-pad.b);ctx.lineTo(coords[0][0],h-pad.b);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
-    ctx.beginPath();coords.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.strokeStyle="#8b6cff";ctx.lineWidth=3;ctx.stroke();
-    coords.forEach(([x,y])=>{ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle="#b5a5ff";ctx.fill();ctx.strokeStyle="#10141b";ctx.lineWidth=2;ctx.stroke()});
+function renderGoals(){
+  const strengthNames=Object.keys(goals).filter(k=>!["Easy Run","Quality Run"].includes(k));
+  if(goalTab==="strength"){
+    $("#goalList").innerHTML=strengthNames.map(name=>{
+      const cur=Math.round(latestExercise(name).weight),goal=goals[name],pc=exerciseProgress(name),e=exerciseDefault(name);
+      const unit=e?.assistance?" lb assist":" lb";
+      return '<article class="goal-card"><div class="goal-top"><strong>'+name+'</strong><span class="goal-values">'+cur+unit+' → '+goal+unit+'</span></div><div class="goal-bar"><span style="width:'+pc+'%"></span></div><div class="goal-foot">'+nextRecommendation(findPlanExercise(name))+'</div></article>';
+    }).join("");
+  }else{
+    const easy=state.plan.wednesday.run.minutes,quality=state.plan.sunday.run.minutes;
+    const rows=[["Easy Run",easy,goals["Easy Run"],"Comfortable continuous"],["Quality Run",quality,goals["Quality Run"],"Controlled tempo / progression"]];
+    $("#goalList").innerHTML=rows.map(([name,cur,goal,note])=>{
+      const base=name==="Easy Run"?22:32,pc=Math.max(0,Math.min(100,Math.round((cur-base)/(goal-base)*100)));
+      return '<article class="goal-card"><div class="goal-top"><strong>'+name+'</strong><span class="goal-values">'+cur+' min → '+goal+' min</span></div><div class="goal-bar"><span style="width:'+pc+'%"></span></div><div class="goal-foot">'+note+'</div></article>';
+    }).join("");
   }
-  ctx.fillStyle="#697384";ctx.font="9px Inter";["W1","W3","W5","W7","W9","W12"].forEach((lab,i)=>{const x=pad.l+(w-pad.l-pad.r)*i/5;ctx.fillText(lab,x-7,h-6)});
 }
-window.addEventListener("resize",()=>{clearTimeout(window.__chartT);window.__chartT=setTimeout(drawChart,100)});
+function findPlanExercise(name){for(const p of Object.values(state.plan)){const e=(p.exercises||[]).find(x=>x.name===name);if(e)return e}return{name,weight:0,group:"upper"}}
+$$("[data-goal-tab]").forEach(b=>b.onclick=()=>{$$("[data-goal-tab]").forEach(x=>x.classList.remove("active"));b.classList.add("active");goalTab=b.dataset.goalTab;renderGoals()});
 
-function renderAll(){renderDashboard();renderPlan();renderGoals();renderHistory();renderSettings()}
+function priorSets(existing,e){
+  const old=existing?.exercises?.find(x=>x.name===e.name);
+  if(old?.setsDone)return old.setsDone;
+  if(old&&old.weight!=null)return Array.from({length:e.sets},()=>({weight:+old.weight||e.weight,reps:+old.reps||e.min,done:true}));
+  return Array.from({length:e.sets},()=>({weight:e.weight,reps:e.min,done:false}));
+}
+function openSession(key,offset=0){
+  const p=state.plan[key],date=dayDate(key,offset),existing=logFor(key,offset);
+  activeSession={key,offset,p,date,existing};
+  $("#sessionTitle").textContent=p.title;$("#sessionDate").textContent=p.day+" • "+fmt(date);
+  if(p.type==="gym"){
+    $("#sessionBody").innerHTML=p.exercises.map((e,i)=>{
+      const sets=priorSets(existing,e);
+      return '<article class="exercise-card" data-ex="'+i+'"><div class="exercise-title"><div><strong>'+e.name+'</strong><span>'+e.sets+' sets • '+e.min+(e.max!==e.min?"–"+e.max:"")+(e.unit==="sec"?" sec":" reps")+' • '+e.rest+'s rest</span></div><span class="exercise-count">0/'+e.sets+'</span></div><div class="set-list">'+sets.map((s,j)=>
+        '<div class="set-row '+(s.done?"checked":"")+'" data-set="'+j+'"><div class="set-num">'+(j+1)+'</div>'+
+        '<div class="field"><label>'+(e.unit==="sec"?"Weight":"Weight")+'</label><input inputmode="decimal" data-weight value="'+(e.unit==="sec"?"":s.weight)+'" '+(e.unit==="sec"?"disabled":"")+'></div>'+
+        '<div class="field"><label>'+(e.unit==="sec"?"Seconds":"Reps")+'</label><input inputmode="numeric" data-reps value="'+s.reps+'"></div>'+
+        '<button class="check-set '+(s.done?"checked":"")+'" type="button">✓</button></div>'
+      ).join("")+'</div></article>';
+    }).join("");
+    $$(".check-set").forEach(btn=>btn.onclick=()=>{
+      btn.classList.toggle("checked");btn.closest(".set-row").classList.toggle("checked");
+      updateSessionProgress();
+    });
+  }else{
+    const steps=existing?.steps||[
+      {label:key==="sunday"?"Warm up • 10 min easy":"Run • easy conversational",done:false},
+      ...(key==="sunday"?[{label:"Quality • 10–15 min comfortably hard",done:false},{label:"Cool down • easy",done:false}]:[])
+    ];
+    $("#sessionBody").innerHTML='<article class="run-card"><div class="run-plan">'+p.run.note+'</div><div class="run-fields"><div class="field"><label>Minutes</label><input id="runMinutes" inputmode="numeric" value="'+(existing?.minutes??p.run.minutes)+'"></div><div class="field"><label>Miles</label><input id="runMilesInput" inputmode="decimal" value="'+(existing?.distance??p.run.distance)+'"></div><div class="field"><label>Effort 1–10</label><input id="runEffort" inputmode="numeric" value="'+(existing?.effort??p.run.effort)+'"></div></div><div class="run-checks">'+steps.map((s,i)=>'<div class="run-step '+(s.done?"done":"")+'" data-runstep="'+i+'"><span>'+s.label+'</span><button type="button">'+(s.done?"✓":"✓")+'</button></div>').join("")+'</div></article>';
+    $$(".run-step button").forEach(btn=>btn.onclick=()=>{btn.closest(".run-step").classList.toggle("done");updateSessionProgress()});
+  }
+  $("#session").classList.add("open");updateSessionProgress();
+}
+window.openSession=openSession;
+function updateSessionProgress(){
+  if(!activeSession)return;
+  let done=0,total=0;
+  if(activeSession.p.type==="gym"){
+    const cards=$$(".exercise-card");
+    cards.forEach(card=>{
+      const buttons=[...card.querySelectorAll(".check-set")],d=buttons.filter(b=>b.classList.contains("checked")).length;
+      done+=d;total+=buttons.length;
+      card.querySelector(".exercise-count").textContent=d+"/"+buttons.length;
+      card.classList.toggle("complete",d===buttons.length&&buttons.length>0);
+    });
+  }else{
+    const steps=$$(".run-step");done=steps.filter(x=>x.classList.contains("done")).length;total=steps.length;
+  }
+  const pc=total?Math.round(done/total*100):0;
+  $("#sessionPct").textContent=pc+"%";$("#sessionProgress").style.width=pc+"%";
+  $("#finishSession").textContent=pc===100?"Finish session":"Save progress";
+}
+$("#closeSession").onclick=()=>$("#session").classList.remove("open");
+
+function applyProgression(p,loggedExercises){
+  p.exercises.forEach(e=>{
+    if(e.unit==="sec")return;
+    const le=loggedExercises.find(x=>x.name===e.name);if(!le)return;
+    const allDone=le.setsDone.length===e.sets&&le.setsDone.every(s=>s.done);
+    const allTop=le.setsDone.every(s=>(+s.reps||0)>=e.max);
+    if(allDone&&allTop){
+      const inc=e.group==="lower"?10:5;
+      if(e.assistance)e.weight=Math.max(goals[e.name]||0,e.weight-inc);
+      else e.weight=Math.min(goals[e.name]||Infinity,e.weight+inc);
+    }
+  });
+}
+$("#finishSession").onclick=()=>{
+  if(!activeSession)return;
+  const {key,p,date,existing}=activeSession;
+  const log={id:existing?.id||Date.now(),date:iso(date),dayKey:key,type:p.type,title:p.title,completedAt:new Date().toISOString()};
+  if(p.type==="gym"){
+    log.exercises=p.exercises.map((e,i)=>{
+      const card=document.querySelector('.exercise-card[data-ex="'+i+'"]');
+      const setsDone=[...card.querySelectorAll(".set-row")].map(row=>({
+        weight:+row.querySelector("[data-weight]")?.value||0,
+        reps:+row.querySelector("[data-reps]").value||0,
+        done:row.querySelector(".check-set").classList.contains("checked")
+      }));
+      return{name:e.name,targetMin:e.min,targetMax:e.max,setsDone};
+    });
+    applyProgression(p,log.exercises);
+  }else{
+    log.minutes=+$("#runMinutes").value||0;log.distance=+$("#runMilesInput").value||0;log.effort=+$("#runEffort").value||0;
+    log.steps=$$(".run-step").map(s=>({label:s.querySelector("span").textContent,done:s.classList.contains("done")}));
+    const allDone=log.steps.length&&log.steps.every(s=>s.done);
+    if(allDone&&log.effort<=7){
+      const target=key==="wednesday"?goals["Easy Run"]:goals["Quality Run"];
+      p.run.minutes=Math.min(target,p.run.minutes+2);
+    }
+  }
+  const idx=state.logs.findIndex(l=>l.date===log.date&&l.dayKey===key);
+  if(idx>=0)state.logs[idx]=log;else state.logs.push(log);
+  state.logs.sort((a,b)=>a.date.localeCompare(b.date));
+  save();$("#session").classList.remove("open");activeSession=null;renderAll();toast("Saved");
+};
+
+function renderHistory(){
+  const logs=[...state.logs].reverse();
+  $("#historyList").innerHTML=logs.length?logs.map(l=>{
+    const d=new Date(l.date+"T12:00:00");
+    let meta="";
+    if(l.type==="run")meta=(+l.distance||0).toFixed(2)+" mi<br>"+(+l.minutes||0)+" min";
+    else{
+      const sets=(l.exercises||[]).reduce((a,e)=>a+(e.setsDone?e.setsDone.filter(s=>s.done).length:(+e.sets||0)),0);
+      meta=sets+" sets";
+    }
+    return '<article class="history-card"><div><strong>'+l.title+'</strong><span>'+d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})+'</span></div><div class="history-meta">'+meta+'</div></article>';
+  }).join(""):'<div class="empty">No sessions yet.</div>';
+}
+$("#exportData").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="gym-planner-data.json";a.click();URL.revokeObjectURL(a.href);
+};
+
+function strengthScoreForLog(log){
+  const vals=[];
+  (log.exercises||[]).forEach(e=>{
+    const def=exerciseDefault(e.name),goal=goals[e.name];if(!def||goal==null)return;
+    let weight=0;
+    if(e.setsDone?.length){const done=e.setsDone.filter(s=>s.done);if(done.length)weight=done.reduce((a,s)=>a+(+s.weight||0),0)/done.length}
+    else weight=+e.weight||0;
+    if(!weight&&e.name!=="Plank")return;
+    let pc;
+    if(def.assistance)pc=(def.weight-weight)/(def.weight-goal);
+    else pc=(weight-def.weight)/(goal-def.weight);
+    vals.push(Math.max(0,Math.min(1,pc)));
+  });
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length*100:null;
+}
+function drawChart(){
+  const c=$("#progressChart");if(!c)return;const r=c.getBoundingClientRect();if(r.width<10)return;
+  const dpr=window.devicePixelRatio||1;c.width=r.width*dpr;c.height=r.height*dpr;const ctx=c.getContext("2d");ctx.scale(dpr,dpr);
+  const w=r.width,h=r.height,p={l:28,r:10,t:10,b:22};ctx.clearRect(0,0,w,h);
+  ctx.font="8px Inter";ctx.fillStyle="#687181";ctx.strokeStyle="#232935";ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=p.t+(h-p.t-p.b)*i/4;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(w-p.r,y);ctx.stroke();ctx.fillText((100-i*25)+"",4,y+3)}
+  const target=[];for(let i=0;i<12;i++){target.push([p.l+(w-p.l-p.r)*i/11,p.t+(h-p.t-p.b)*(1-i/11)])}
+  ctx.setLineDash([4,4]);ctx.strokeStyle="#44d39b";ctx.globalAlpha=.65;ctx.beginPath();target.forEach((q,i)=>i?ctx.lineTo(...q):ctx.moveTo(...q));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+  const gym=state.logs.filter(l=>l.type==="gym").map(l=>({date:l.date,v:strengthScoreForLog(l)})).filter(x=>x.v!=null).slice(-12);
+  if(gym.length){
+    const pts=gym.map((x,i)=>[p.l+(w-p.l-p.r)*(gym.length===1?.5:i/(gym.length-1)),p.t+(h-p.t-p.b)*(1-x.v/100)]);
+    const grad=ctx.createLinearGradient(0,p.t,0,h-p.b);grad.addColorStop(0,"rgba(124,92,255,.32)");grad.addColorStop(1,"rgba(124,92,255,0)");
+    ctx.beginPath();pts.forEach((q,i)=>i?ctx.lineTo(...q):ctx.moveTo(...q));ctx.lineTo(pts.at(-1)[0],h-p.b);ctx.lineTo(pts[0][0],h-p.b);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+    ctx.beginPath();pts.forEach((q,i)=>i?ctx.lineTo(...q):ctx.moveTo(...q));ctx.strokeStyle="#8d73ff";ctx.lineWidth=2.5;ctx.stroke();
+  }
+  ctx.fillStyle="#687181";["W1","W4","W8","W12"].forEach((x,i)=>ctx.fillText(x,p.l+(w-p.l-p.r)*i/3-5,h-5));
+}
+window.addEventListener("resize",()=>{clearTimeout(window.__r);window.__r=setTimeout(drawChart,80)});
+
+function renderAll(){renderHome();renderPlan();renderGoals();renderHistory()}
 renderAll();

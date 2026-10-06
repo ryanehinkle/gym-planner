@@ -50,7 +50,58 @@ function loadState(){
 }
 function mergeState(x){
   const d=initialState();
-  return {...d,...x,profile:{...d.profile,...x.profile},settings:{...d.settings,...x.settings},plan:x.plan||d.plan,goals:{...d.goals,...x.goals},logs:Array.isArray(x.logs)?x.logs:[]};
+  const raw=x?.plan&&typeof x.plan==="object"?JSON.parse(JSON.stringify(x.plan)):{};
+
+  // Always rebuild the plan into the current Tue/Wed/Fri/Sun schema.
+  const tueSource=raw.tuesday||raw.monday||{};
+  const normalizedPlan={
+    tuesday:{...d.plan.tuesday,...tueSource,day:"Tuesday",type:"gym"},
+    wednesday:{...d.plan.wednesday,...(raw.wednesday||{}),day:"Wednesday",type:"run"},
+    friday:{...d.plan.friday,...(raw.friday||{}),day:"Friday",type:"gym"},
+    sunday:{...d.plan.sunday,...(raw.sunday||{}),day:"Sunday",type:"run"}
+  };
+
+  ["tuesday","friday"].forEach(key=>{
+    const defaults=d.plan[key].exercises;
+    const saved=Array.isArray(normalizedPlan[key].exercises)?normalizedPlan[key].exercises:[];
+    normalizedPlan[key].exercises=defaults.map(def=>{
+      const prior=saved.find(e=>e?.name===def.name);
+      return prior?{...def,...prior}:{...def};
+    });
+  });
+
+  normalizedPlan.wednesday.run={
+    ...d.plan.wednesday.run,
+    ...(raw.wednesday?.run||{}),
+    note:"Easy conversational pace"
+  };
+
+  normalizedPlan.sunday={
+    ...normalizedPlan.sunday,
+    title:"Quality Run",
+    subtitle:"Controlled intensity • tempo / progression",
+    duration:"30–35 min",
+    run:{
+      ...d.plan.sunday.run,
+      ...(raw.sunday?.run||{}),
+      effort:7,
+      note:"10 min easy • 10–15 min comfortably hard • easy cooldown"
+    }
+  };
+
+  const logs=Array.isArray(x?.logs)?x.logs.map(log=>
+    log?.dayKey==="monday"?{...log,dayKey:"tuesday"}:log
+  ):[];
+
+  return {
+    ...d,
+    ...x,
+    profile:{...d.profile,...(x?.profile||{})},
+    settings:{...d.settings,...(x?.settings||{})},
+    plan:normalizedPlan,
+    goals:{...d.goals,...(x?.goals||{})},
+    logs
+  };
 }
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];

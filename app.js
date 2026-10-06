@@ -1,7 +1,7 @@
 const STORAGE_KEY="formGymPlannerV1";
 
 const defaultPlan = {
-  monday:{day:"Monday",type:"gym",title:"Full Body A",subtitle:"Strength + muscle • machine focused",duration:"~60 min",exercises:[
+  tuesday:{day:"Tuesday",type:"gym",title:"Full Body A",subtitle:"Strength + muscle • machine focused",duration:"~60 min",exercises:[
     {name:"Chest Press Machine",sets:3,min:8,max:10,weight:50,rest:120,group:"upper"},
     {name:"Leg Press",sets:3,min:10,max:10,weight:120,rest:120,group:"lower"},
     {name:"Lat Pulldown",sets:3,min:8,max:10,weight:70,rest:90,group:"upper"},
@@ -11,7 +11,7 @@ const defaultPlan = {
     {name:"Ab Crunch Machine",sets:3,min:12,max:15,weight:40,rest:60,group:"core"},
     {name:"Plank",sets:2,min:30,max:60,weight:0,rest:60,group:"core",unit:"sec"}
   ]},
-  wednesday:{day:"Wednesday",type:"run",title:"Easy Run",subtitle:"Conversational aerobic work",duration:"20–25 min",run:{minutes:22,distance:2.0,effort:5}},
+  wednesday:{day:"Wednesday",type:"run",title:"Easy Run",subtitle:"Conversational aerobic work",duration:"20–25 min",run:{minutes:22,distance:2.0,effort:5,note:"Easy conversational pace"}},
   friday:{day:"Friday",type:"gym",title:"Full Body B",subtitle:"Strength + muscle • machine focused",duration:"~60 min",exercises:[
     {name:"Incline Chest Press Machine",sets:3,min:8,max:10,weight:45,rest:120,group:"upper"},
     {name:"Leg Press",sets:3,min:8,max:10,weight:130,rest:120,group:"lower"},
@@ -23,7 +23,7 @@ const defaultPlan = {
     {name:"Rope Triceps Pushdown",sets:2,min:10,max:12,weight:25,rest:60,group:"upper"},
     {name:"Ab Crunch Machine",sets:3,min:12,max:15,weight:40,rest:60,group:"core"}
   ]},
-  sunday:{day:"Sunday",type:"run",title:"Long Easy Run",subtitle:"Easy endurance • stay conversational",duration:"30–35 min",run:{minutes:32,distance:2.8,effort:5}}
+  sunday:{day:"Sunday",type:"run",title:"Quality Run",subtitle:"Controlled intensity • tempo / progression",duration:"30–35 min",run:{minutes:32,distance:2.8,effort:7,note:"10 min easy • 10–15 min comfortably hard • easy cooldown"}}
 };
 
 const goalDefaults = {
@@ -61,7 +61,7 @@ function mondayOf(date=new Date()){
   const d=new Date(date);d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d;
 }
 function weekRange(offset=0){const start=mondayOf();start.setDate(start.getDate()+offset*7);const end=new Date(start);end.setDate(start.getDate()+6);return {start,end}}
-function dayDate(dayKey,offset=0){const map={monday:0,wednesday:2,friday:4,sunday:6};const d=weekRange(offset).start;const x=new Date(d);x.setDate(d.getDate()+map[dayKey]);return x}
+function dayDate(dayKey,offset=0){const map={tuesday:1,wednesday:2,friday:4,sunday:6};const d=weekRange(offset).start;const x=new Date(d);x.setDate(d.getDate()+map[dayKey]);return x}
 function logFor(dayKey,offset=0){const date=isoDate(dayDate(dayKey,offset));return state.logs.find(l=>l.date===date&&l.dayKey===dayKey)}
 function completedThisWeek(){return Object.keys(defaultPlan).filter(k=>!!logFor(k,0)).length}
 function sessionCountThisMonth(){const now=new Date();return state.logs.filter(l=>{const d=new Date(l.date+"T12:00:00");return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()}).length}
@@ -91,9 +91,9 @@ function streakWeeks(){
   return streak;
 }
 function nextSession(){
-  const now=new Date(), order=["monday","wednesday","friday","sunday"];
+  const now=new Date(), order=["tuesday","wednesday","friday","sunday"];
   for(const k of order){const d=dayDate(k,0);d.setHours(23,59,59);if(now<=d&&!logFor(k,0))return {key:k,date:dayDate(k,0),...state.plan[k]}}
-  return {key:"monday",date:dayDate("monday",1),...state.plan.monday,nextWeek:true};
+  return {key:"tuesday",date:dayDate("tuesday",1),...state.plan.tuesday,nextWeek:true};
 }
 
 function switchTab(id){
@@ -143,7 +143,7 @@ function renderPlan(){
     const p=state.plan[k],log=logFor(k,weekOffset),d=dayDate(k,weekOffset);
     let preview="";
     if(p.type==="gym") preview=p.exercises.slice(0,5).map(e=>'<div class="exercise-row"><div><strong>'+e.name+'</strong><span>'+e.sets+' sets • '+Math.round(e.rest/60*10)/10+' min rest</span></div><span class="exercise-target">'+(e.weight?e.weight+" lb • ":"")+e.min+(e.max!==e.min?"–"+e.max:"")+' reps</span></div>').join("")+'<div class="exercise-row"><div><strong>+'+(p.exercises.length-5)+' more</strong><span>Open session for full plan</span></div></div>';
-    else preview='<div class="exercise-row"><div><strong>Easy conversational pace</strong><span>Effort '+p.run.effort+'/10 • no racing</span></div><span class="exercise-target">'+p.run.minutes+' min target</span></div>';
+    else preview='<div class="exercise-row"><div><strong>'+p.run.note+'</strong><span>Effort '+p.run.effort+'/10'+(k==="sunday"?" • controlled quality":" • no racing")+'</span></div><span class="exercise-target">'+p.run.minutes+' min target</span></div>';
     cards.push('<article class="card plan-card"><div class="plan-card-top"><div><div class="day-badge">'+p.day.toUpperCase()+' • '+fmtDate(d)+'</div><h3>'+p.title+'</h3><p>'+p.subtitle+'</p></div><span class="type-badge">'+(p.type==="gym"?"STRENGTH":"RUN")+'</span></div><div class="exercise-preview">'+preview+'</div><div class="plan-actions"><button class="'+(log?"secondary-btn":"primary-btn")+'" onclick="openSession(\''+k+'\','+weekOffset+')">'+(log?"View / edit log":"Start & log session")+'</button>'+(log?'<span class="completed-badge">✓ COMPLETE</span>':'')+'</div></article>');
   });
   $("#planGrid").innerHTML=cards.join("");
@@ -201,7 +201,7 @@ function openSession(dayKey,offset=0){
       return '<div class="log-row"><div class="log-exercise"><strong>'+e.name+'</strong><span>Plan: '+e.sets+' × '+e.min+(e.max!==e.min?"–"+e.max:"")+(e.unit==="sec"?" sec":' • '+(e.weight||"bodyweight")+(e.weight?" lb":""))+' • rest '+e.rest+' sec</span></div><div class="log-field"><label>Weight '+(e.unit==="sec"?"(optional)":"lb")+'</label><input data-field="weight" data-i="'+i+'" type="number" step="1" value="'+(x.weight??e.weight)+'"></div><div class="log-field"><label>Avg reps</label><input data-field="reps" data-i="'+i+'" type="number" step="1" value="'+(x.reps??e.min)+'"></div><div class="log-field"><label>RIR</label><input data-field="rir" data-i="'+i+'" type="number" min="0" max="5" step="1" value="'+(x.rir??2)+'"></div></div>';
     }).join("");
   }else{
-    rows='<div class="log-row run"><div class="log-exercise"><strong>'+p.title+'</strong><span>Plan: '+p.run.minutes+' minutes • conversational pace • effort '+p.run.effort+'/10</span></div><div class="log-field"><label>Minutes</label><input id="runMinutes" type="number" value="'+(existing?.minutes??p.run.minutes)+'"></div><div class="log-field"><label>Miles</label><input id="runDistance" type="number" step=".01" value="'+(existing?.distance??p.run.distance)+'"></div><div class="log-field"><label>Effort 1–10</label><input id="runEffort" type="number" min="1" max="10" value="'+(existing?.effort??p.run.effort)+'"></div></div>';
+    rows='<div class="log-row run"><div class="log-exercise"><strong>'+p.title+'</strong><span>Plan: '+p.run.minutes+' minutes • '+p.run.note+' • effort '+p.run.effort+'/10</span></div><div class="log-field"><label>Minutes</label><input id="runMinutes" type="number" value="'+(existing?.minutes??p.run.minutes)+'"></div><div class="log-field"><label>Miles</label><input id="runDistance" type="number" step=".01" value="'+(existing?.distance??p.run.distance)+'"></div><div class="log-field"><label>Effort 1–10</label><input id="runEffort" type="number" min="1" max="10" value="'+(existing?.effort??p.run.effort)+'"></div></div>';
   }
   $("#sessionModalContent").innerHTML='<div class="session-head"><div class="eyebrow accent">'+p.day.toUpperCase()+' • '+fmtDate(date)+'</div><h2>'+p.title+'</h2><p>'+p.subtitle+' — targets are guidance; record what you actually did.</p></div><div class="session-body"><div class="log-table">'+rows+'</div><div class="session-footer"><div class="session-note">'+(p.type==="gym"?"Aim to finish most working sets with 2–3 clean reps in reserve.":"Keep this easy enough to speak in full sentences.")+'</div><button class="primary-btn" id="saveSessionBtn">'+(existing?"Update session":"Complete session")+'</button></div></div>';
   $("#sessionModal").classList.add("open");

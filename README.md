@@ -4,7 +4,7 @@ A static, GitHub Pages-ready personal training dashboard for strength, running, 
 
 ## Features
 
-- Monday / Friday full-body strength plan
+- Tuesday / Friday full-body strength plan
 - Wednesday / Sunday running plan
 - Planned targets and actual workout logging
 - Persistent browser storage (no backend required)
